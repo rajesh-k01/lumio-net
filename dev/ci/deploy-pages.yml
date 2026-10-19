@@ -1,0 +1,57 @@
+# GitHub Pages deployment workflow.
+#
+# Copy this file to .github/workflows/deploy-pages.yml to let GitHub publish
+# the app on every push to main, instead of using dev/deploy.sh.
+#
+#   cp dev/ci/deploy-pages.yml .github/workflows/deploy-pages.yml
+#   git add .github/workflows/deploy-pages.yml && git commit -m "Publish via Actions"
+#
+# Then set Settings -> Pages -> Build and deployment -> Source: "GitHub Actions".
+#
+# The site/ folder is the whole app: no build step, no dependencies, so the
+# workflow only uploads and deploys it.
+
+name: Deploy site to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - ".github/workflows/deploy-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          # Turns Pages on for this repo if it was never enabled.
+          enablement: true
+
+      - name: Upload the site as a Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+          include-hidden-files: true
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
