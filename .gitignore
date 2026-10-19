@@ -1,0 +1,11 @@
+# dependencies
+node_modules/
+
+# e2e output
+dev/e2e/shots/
+
+# editors / OS
+.DS_Store
+*.swp
+.idea/
+.vscode/

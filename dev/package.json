@@ -1,0 +1,19 @@
+{
+  "name": "lumio-dev",
+  "version": "1.0.0",
+  "description": "Dev harness for the Lumio Enhancer site: unit tests, ONNX parity fixtures and browser e2e scripts.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.mjs",
+    "serve": "python3 e2e/serve.py ../site 8766",
+    "e2e": "python3 e2e/full.py",
+    "smoke": "python3 e2e/smoke.py"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@fontsource-variable/archivo": "^5.3.0",
+    "onnxruntime-web": "^1.30.0"
+  }
+}
