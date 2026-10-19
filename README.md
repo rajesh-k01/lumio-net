@@ -71,8 +71,10 @@ lumio-net/
 │   ├── models/            ← trained .onnx models + models.json
 │   └── assets/fonts/      ← Archivo (SIL OFL)
 ├── dev/                   ← tests and dev tooling (not published)
+│   ├── deploy.sh          ← publishes site/ to the gh-pages branch
+│   ├── ci/deploy-pages.yml← GitHub Actions workflow (copy to .github/workflows/)
 │   ├── tests/             ← node:test unit + ONNX parity tests
-│   ├── e2e/               ← Playwright browser tests
+│   ├── e2e/               ← Playwright browser tests + verify.py (live-site check)
 │   └── fixtures/          ← toy model + Python parity reference
 └── docs/                  ← screenshots used by this README
 ```
@@ -110,9 +112,25 @@ Input must be float32 `[1,3,h,w]` RGB in `0..1`, output `[1,3,scale*h,scale*w]`.
 
 The `site/` folder is the whole app. Publish it anywhere that serves static files.
 
-**GitHub Pages** (already live for this repo): *Settings → Pages → Source: Deploy from a branch → `main` / `/site`*.
+### GitHub Pages (this repo)
 
-Other hosts:
+The `gh-pages` branch holds the published site, so publishing is one command:
+
+```bash
+./dev/deploy.sh     # copies site/ onto gh-pages and pushes it
+```
+
+GitHub Pages serves that branch at **https://rajesh-k01.github.io/lumio-net/**.
+
+The first time, a repo admin has to switch Pages on (GitHub keeps this setting per repository):
+
+*Settings → Pages → Build and deployment → Source: **Deploy from a branch** → Branch: **gh-pages** → Folder: **/ (root)** → Save.*
+
+After that, every `./dev/deploy.sh` (or push to `gh-pages`) republishes the site automatically.
+
+**Prefer CI?** Copy `dev/ci/deploy-pages.yml` to `.github/workflows/deploy-pages.yml` and set the Pages source to **GitHub Actions**. Every push to `main` then deploys itself — no local command needed.
+
+### Other hosts
 
 - **Netlify** — drag the `site` folder onto [app.netlify.com/drop](https://app.netlify.com/drop)
 - **Cloudflare Pages** — Create project → Direct upload → choose `site`
@@ -129,9 +147,12 @@ npm test                  # 14 unit + ONNX parity tests (node:test)
 # browser tests (Playwright)
 python3 e2e/serve.py ../site 8766 &
 python3 e2e/full.py       # full suite, writes screenshots to dev/e2e/shots/
+
+# check a published site end to end (loads it, enhances a photo, checks the download)
+python3 e2e/verify.py https://rajesh-k01.github.io/lumio-net/
 ```
 
-The parity test runs the exported toy model through the JavaScript tiler and compares it against the canonical Python `run_tiled()` output in `dev/fixtures/parity.json`.
+The parity test runs the exported toy model through the JavaScript tiler and compares it against the canonical Python `run_tiled()` output in `dev/fixtures/parity.json`. `e2e/verify.py` is the one that proves the *deployed* app works, not just the local copy.
 
 ## Honest status
 
