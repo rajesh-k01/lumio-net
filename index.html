@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en" data-palette="cyanotype">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lumio Enhancer</title>
+<meta name="description" content="Free photo enhancer. Upscale to HD, 2K, 4K or 8K and sharpen detail, right in your browser. Your photos stay on your device.">
+<meta name="theme-color" content="#0c2d57">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preload" href="assets/fonts/archivo-latin-wdth.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="./" aria-label="Lumio Enhancer">
+    <svg viewBox="0 0 32 32" width="22" height="22" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2.4"><rect x="5" y="5" width="9" height="9"/><rect x="18" y="5" width="9" height="9"/><rect x="5" y="18" width="9" height="9"/></g><rect class="brand-fill" x="18" y="18" width="9" height="9"/></svg>
+    <span>Lumio</span>
+  </a>
+  <p class="privacy">Your photos never leave this device unless you pick the server engine.</p>
+  <div class="swatches" role="group" aria-label="Colour theme">
+    <button type="button" data-palette="cyanotype" aria-label="Cyanotype theme" aria-pressed="true"></button>
+    <button type="button" data-palette="daylight" aria-label="Daylight theme" aria-pressed="false"></button>
+    <button type="button" data-palette="darkroom" aria-label="Darkroom theme" aria-pressed="false"></button>
+  </div>
+</header>
+
+<main id="workspace" data-state="idle">
+  <section class="intro">
+    <h1>Resolve your photos.</h1>
+    <p>Pick a size, press Enhance. Sharper detail and bigger pixels in seconds. Drop a photo anywhere on this page.</p>
+  </section>
+
+  <section class="stage" aria-label="Photo">
+    <div class="ruler ruler-x" aria-hidden="true"></div>
+    <div class="ruler ruler-y" aria-hidden="true"></div>
+    <div class="frame" id="frame">
+      <i class="crop tl"></i><i class="crop tr"></i><i class="crop bl"></i><i class="crop br"></i>
+      <div class="viewer" id="viewer">
+        <canvas id="before" aria-label="Original photo"></canvas>
+        <canvas id="after" aria-label="Enhanced photo"></canvas>
+        <div class="scan" id="scan" aria-hidden="true"></div>
+        <div class="tag tag-l" id="tagL">Original</div>
+        <div class="tag tag-r" id="tagR">Enhanced</div>
+        <div class="handle" id="handle" role="slider" tabindex="0" aria-label="Compare original and enhanced" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50"><span></span></div>
+      </div>
+    </div>
+    <div class="stage-bar">
+      <p id="meta" class="meta" aria-live="polite">Sample photo · 640 × 427</p>
+      <div class="stage-actions">
+        <label class="btn ghost" for="file">Open photo</label>
+        <input id="file" type="file" accept="image/*" hidden>
+        <a class="btn solid" id="download" hidden download>Download</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="sheet" aria-label="Controls">
+    <div class="row" role="radiogroup" aria-labelledby="l-engine">
+      <h2 id="l-engine">Engine</h2>
+      <div class="engines" id="engines">
+        <i class="bar" aria-hidden="true"></i>
+        <label class="engine"><input type="radio" name="engine" value="instant" checked><b>Instant</b><span>Smart resize and sharpen. Works offline.</span></label>
+        <label class="engine" id="engineNet" hidden><input type="radio" name="engine" value="lumionet"><b>LumioNet</b><span id="netNote">AI model running in your browser.</span></label>
+        <label class="engine" id="engineSrv" hidden><input type="radio" name="engine" value="server"><b>Server</b><span id="srvNote">Strongest quality. Uploads your photo.</span></label>
+      </div>
+    </div>
+
+    <div class="row">
+      <h2 id="l-size">Size</h2>
+      <div class="seg" id="sizeSeg" role="radiogroup" aria-labelledby="l-size">
+        <i class="bar" aria-hidden="true"></i>
+        <button type="button" role="radio" data-preset="hd" aria-checked="true">HD</button>
+        <button type="button" role="radio" data-preset="2k" aria-checked="false">2K</button>
+        <button type="button" role="radio" data-preset="4k" aria-checked="false">4K</button>
+        <button type="button" role="radio" data-preset="8k" aria-checked="false" title="8K — heavy on memory, give it a moment">8K</button>
+      </div>
+      <p class="readout"><span id="sizeOut">1920 × 1281</span> px</p>
+    </div>
+
+    <div class="row">
+      <h2 id="l-detail"><label for="detail">Detail</label></h2>
+      <div class="slider"><input id="detail" type="range" min="0" max="100" value="60"><output id="detailVal" for="detail">60</output></div>
+    </div>
+
+    <div class="row">
+      <h2><label for="toneSel">Colour tone</label></h2>
+      <div class="tone">
+        <select id="toneSel"><option value="none">None</option></select>
+        <div class="slider" id="toneAmtWrap" hidden><input id="toneAmt" type="range" min="0" max="100" value="100" aria-label="Tone amount"><output id="toneAmtVal">100</output></div>
+      </div>
+      <details class="learn" id="learn">
+        <summary>Match another app’s look</summary>
+        <p class="hint">Pick the same photo twice: your original, and the result from the app whose colours you like. Lumio learns the difference and can apply it to any photo.</p>
+        <div class="slots">
+          <label class="slot" id="slotA" for="refA"><span>Original</span><em>Choose file</em></label>
+          <label class="slot" id="slotB" for="refB"><span>Their result</span><em>Choose file</em></label>
+          <input id="refA" type="file" accept="image/*" hidden><input id="refB" type="file" accept="image/*" hidden>
+        </div>
+        <label class="check"><input type="checkbox" id="merge"> Add to my profile (average with earlier pairs)</label>
+        <div class="learn-actions"><button type="button" class="btn ghost" id="learnBtn" disabled>Learn this look</button><button type="button" class="btn quiet" id="delProfile" hidden>Delete profile</button></div>
+        <svg id="curve" viewBox="0 0 120 120" role="img" aria-label="Learned tone curves" hidden>
+          <path class="grid" d="M0 120L120 0M30 0V120M60 0V120M90 0V120M0 30H120M0 60H120M0 90H120"/>
+          <path id="cR" class="cr" pathLength="1"/><path id="cG" class="cg" pathLength="1"/><path id="cB" class="cb" pathLength="1"/>
+        </svg>
+      </details>
+    </div>
+
+    <div class="row">
+      <h2 id="l-fmt">File type</h2>
+      <div class="seg" id="fmtSeg" role="radiogroup" aria-labelledby="l-fmt">
+        <i class="bar" aria-hidden="true"></i>
+        <button type="button" role="radio" data-fmt="jpeg" aria-checked="true">JPEG</button>
+        <button type="button" role="radio" data-fmt="png" aria-checked="false">PNG</button>
+      </div>
+    </div>
+
+    <div class="go-wrap">
+      <button type="button" id="go" class="go"><i class="fill" id="goFill"></i><span id="goText">Enhance</span></button>
+      <p class="eta" id="eta" aria-live="polite"></p>
+    </div>
+  </section>
+</main>
+
+<div id="toasts" role="status" aria-live="polite"></div>
+<div id="dropveil" aria-hidden="true"><p>Drop to open</p></div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
