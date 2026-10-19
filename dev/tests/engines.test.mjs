@@ -119,3 +119,85 @@ test("blend: strength 1 keeps the model, 0 gives the base, 0.5 is halfway", () =
   const b = model.slice(); blendToward(b, base, 0); assert.deepEqual([...b], [100, 100, 100, 255]);
   const c = model.slice(); blendToward(c, base, 0.5); assert.deepEqual([...c], [150, 100, 50, 255]);
 });
+
+// ---------- Lanczos resampling (the 8K / quality path)
+import { enhanceLanczos, axisTaps, lanczos, blurLumaBand } from "../../site/js/engines/resample.js";
+
+test("lanczos: kernel peaks at 1 and vanishes past the support", () => {
+  assert.equal(lanczos(0), 1);
+  assert.ok(Math.abs(lanczos(1)) < 0.1);
+  assert.equal(lanczos(3), 0);
+  assert.equal(lanczos(-3), 0);
+});
+test("axisTaps: weights are normalised, so flat areas stay exactly flat", () => {
+  const { w, taps } = axisTaps(64, 128);
+  for (let o = 0; o < 64; o++) {
+    let sum = 0;
+    for (let k = 0; k < taps; k++) sum += w[o * taps + k];
+    assert.ok(Math.abs(sum - 1) < 1e-5, `row ${o} sums to ${sum}`);
+  }
+});
+test("resample: a flat image stays perfectly flat (no ringing)", () => {
+  const w = 40, h = 40, px = new Uint8ClampedArray(w * h * 4);
+  for (let i = 0; i < w * h; i++) px.set([120, 90, 60, 255], 4 * i);
+  const out = enhanceLanczos(px, w, h, 200, 200, { amount: 0, radius: 1 });
+  for (let i = 0; i < 200 * 200; i++) {
+    assert.equal(out[4 * i], 120); assert.equal(out[4 * i + 1], 90); assert.equal(out[4 * i + 2], 60);
+  }
+});
+test("resample: a hard edge stays hard instead of smearing", () => {
+  const w = 40, h = 40, px = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) px.set([x < w / 2 ? 20 : 220, 0, 0, 255], 4 * (y * w + x));
+  const out = enhanceLanczos(px, w, h, 160, 160, { amount: 0, radius: 1 });
+  const row = 80, vals = [];
+  for (let x = 0; x < 160; x++) vals.push(out[4 * (row * 160 + x)]);
+  const lo = vals.findIndex((v) => v > 120), hi = vals.findIndex((v) => v > 200);
+  assert.ok(hi - lo <= 2, `edge transition was ${hi - lo} px wide, expected 1-2`);
+});
+test("resample: downscaling a checkerboard averages instead of aliasing", () => {
+  const w = 40, h = 40, px = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) px.set([(x + y) % 2 ? 220 : 20, 0, 0, 255], 4 * (y * w + x));
+  const out = enhanceLanczos(px, w, h, 20, 20, { amount: 0, radius: 1 });
+  const mid = out[4 * (10 * 20 + 10)];
+  assert.ok(mid > 60 && mid < 200, `mid pixel was ${mid}, expected an average around 120`);
+});
+test("resample: bands do not shift the picture (every band lands in the right rows)", () => {
+  // A bright band low down in the image must stay low down after a tiled
+  // resample with sharpening on — this is what a band-offset bug breaks.
+  const w = 64, h = 256, px = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const v = y > 200 ? 240 : 30;
+    px.set([v, v, v, 255], 4 * (y * w + x));
+  }
+  const out = enhanceLanczos(px, w, h, w, h * 2, { amount: 0.8, radius: 2, band: 32 });
+  const rowAt = (y) => out[4 * (y * w + w / 2)];
+  assert.ok(rowAt(10) < 80, `top of the image should stay dark, got ${rowAt(10)}`);
+  assert.ok(rowAt(450) > 200, `the bright band should still be at the bottom, got ${rowAt(450)}`);
+  // the transition must land near the expected place, not smeared over the image
+  let first = 0;
+  for (let y = 0; y < h * 2; y++) if (rowAt(y) > 128) { first = y; break; }
+  assert.ok(Math.abs(first - 400) < 12, `band edge moved to row ${first}, expected ~400`);
+});
+test("resample: sharpening raises edge contrast without moving anything", () => {
+  const w = 64, h = 64, px = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) px.set([x < w / 2 ? 40 : 200, 40, 40, 255], 4 * (y * w + x));
+  const soft = enhanceLanczos(px, w, h, w * 2, h * 2, { amount: 0, radius: 1 });
+  const sharp = enhanceLanczos(px, w, h, w * 2, h * 2, { amount: 0.9, radius: 2 });
+  // biggest step between neighbouring pixels along the row that holds the edge
+  const step = (arr) => {
+    const row = 64;
+    let best = 0;
+    for (let x = 1; x < w * 2; x++) {
+      const d = Math.abs(arr[4 * (row * w * 2 + x)] - arr[4 * (row * w * 2 + x - 1)]);
+      if (d > best) best = d;
+    }
+    return best;
+  };
+  assert.ok(step(sharp) > step(soft), `sharpened step ${step(sharp)} should beat soft ${step(soft)}`);
+  assert.ok(step(sharp) > 90, `sharpened step ${step(sharp)} is too weak to count as sharpening`);
+});
+test("blurLumaBand: flat rows stay flat, edges do not bleed", () => {
+  const w = 8, h = 4, luma = new Float32Array(w * h).fill(100);
+  const out = blurLumaBand(luma, w, h, 1);
+  for (let i = 0; i < w * h; i++) assert.ok(Math.abs(out[i] - 100) < 1e-3);
+});

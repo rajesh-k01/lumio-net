@@ -2,7 +2,8 @@
 // Messages in:  { id, type: "instant" | "lumionet" | "cancel", ... }
 // Messages out: { id, type: "progress" | "done" | "error", ... }
 
-import { sharpenLuma, sharpenRadius } from "../engines/instant-core.js";
+import { sharpenRadius } from "../engines/instant-core.js";
+import { enhanceLanczos } from "../engines/resample.js";
 import { applyLut } from "../tone.js";
 import { tiledInfer, blendToward, Cancelled } from "../engines/tiled.js";
 
@@ -27,14 +28,20 @@ self.onmessage = async ({ data: m }) => {
   if (m.type === "cancel") { cancelled.add(m.id); return; }
   try {
     if (m.type === "instant") {
-      const px = new Uint8ClampedArray(m.pixels);
-      if (m.detail > 0) {
-        send({ id: m.id, type: "progress", stage: "Sharpening", value: 0.05 });
-        sharpenLuma(px, m.width, m.height, m.detail * 1.1, sharpenRadius(m.srcWidth, m.width),
-          (v) => send({ id: m.id, type: "progress", stage: "Sharpening", value: 0.05 + v * 0.85 }));
-      }
+      // The whole upscale happens here: the source pixels go in, the finished
+      // image comes out. Doing it in the worker (and in bands) is what keeps
+      // 8K inside a sane memory budget.
+      const src = new Uint8ClampedArray(m.src);
+      const radius = sharpenRadius(m.srcWidth, m.outWidth);
+      const px = enhanceLanczos(src, m.srcWidth, m.srcHeight, m.outWidth, m.outHeight, {
+        amount: m.detail * 1.0,
+        radius,
+        band: m.outWidth * m.outHeight > 20e6 ? 24 : 48,
+        onProgress: (v) => send({ id: m.id, type: "progress", stage: "Upscaling", value: 0.05 + v * 0.85 }),
+        isCancelled: () => cancelled.has(m.id),
+      });
       if (m.lut && m.toneAmount > 0) applyLut(px, m.lut, m.toneAmount);
-      send({ id: m.id, type: "done", pixels: px.buffer, width: m.width, height: m.height }, [px.buffer]);
+      send({ id: m.id, type: "done", pixels: px.buffer, width: m.outWidth, height: m.outHeight }, [px.buffer]);
     } else if (m.type === "lumionet") {
       const sess = await getSession(m);
       const src = new Uint8ClampedArray(m.src);

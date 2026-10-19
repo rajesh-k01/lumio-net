@@ -18,5 +18,5 @@ export default {
 
   // Limits that keep phones from running out of memory.
   maxInputLongSide: 6000,    // larger photos are scaled down on load
-  maxBrowserLongSide: 3840,  // largest output the in-browser engines will make (4K)
+  maxBrowserLongSide: 7680,  // largest output the in-browser engines will make (8K)
 };

@@ -139,8 +139,10 @@ document.querySelectorAll('input[name="engine"]').forEach((r) => r.addEventListe
 }));
 function syncEngineUI() {
   const b8 = document.querySelector('#sizeSeg [data-preset="8k"]');
-  b8.disabled = S.engine !== "server";
-  if (b8.disabled && S.preset === "8k") { S.preset = "4k"; chooseSeg($("sizeSeg"), document.querySelector('#sizeSeg [data-preset="4k"]')); }
+  // 8K runs in the browser now: the worker resamples in bands, so the memory
+  // stays bounded. The server engine is still the way past 8K.
+  b8.disabled = false;
+  b8.title = "8K — heavy on memory, give it a moment";
   $("l-detail").firstElementChild.textContent = S.engine === "instant" ? "Detail" : "AI strength";
 }
 $("detail").addEventListener("input", (e) => { paintRange(e.target); $("detailVal").textContent = e.target.value; });
@@ -236,9 +238,12 @@ function toneArgs() {
 }
 
 async function runInstant(id, [w, h]) {
-  const big = scaled(S.src, w, h), px = big.getContext("2d").getImageData(0, 0, w, h);
-  const r = await callWorker({ id, type: "instant", pixels: px.data.buffer, width: w, height: h, srcWidth: S.src.width, detail: $("detail").value / 100, ...toneArgs() },
-    [px.data.buffer], (m) => { setProgress(m.value, `${m.stage}…`); });
+  // The worker does the resample and the sharpen, band by band, so an 8K
+  // result never needs the whole image in float buffers at once.
+  const src = S.src.getContext("2d").getImageData(0, 0, S.src.width, S.src.height);
+  const r = await callWorker({ id, type: "instant", src: src.data.buffer, srcWidth: S.src.width, srcHeight: S.src.height,
+    outWidth: w, outHeight: h, detail: $("detail").value / 100, ...toneArgs() },
+    [src.data.buffer], (m) => { setProgress(m.value, `${m.stage}…`); });
   const c = document.createElement("canvas"); c.width = r.width; c.height = r.height;
   c.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(r.pixels), r.width, r.height), 0, 0);
   return c;
@@ -275,6 +280,7 @@ async function enhance() {
   if (S.busy) return cancelJob();
   if (S.engine === "lumionet" && !S.models.length) return toast("LumioNet needs a trained model. See models/README.md.", "error");
   const id = ++S.job, size = outputSize();
+  warnIfHeavy(size);
   S.busy = true; clearResult(); ws.dataset.state = "busy"; go.classList.add("busy"); setProgress(0, "Starting…");
   const t0 = performance.now();
   try {
@@ -299,6 +305,19 @@ async function enhance() {
     else { $("eta").textContent = ""; toast(friendly(e), "error", 7000); }
   }
 }
+/** Big outputs can eat a phone's memory. Warn before we start, not after. */
+function warnIfHeavy([w, h]) {
+  const px = w * h;
+  if (px < 12e6) return;
+  const mb = Math.round((px * 4 * 2.5) / 1e6);
+  const device = navigator.deviceMemory || 4;
+  if (device <= 4) {
+    toast(`${w} × ${h} needs about ${mb} MB. This device may struggle — if it stalls, pick 4K.`, "info", 7000);
+  } else {
+    $("eta").textContent = `Big one: ${w} × ${h} (~${mb} MB). This takes a moment.`;
+  }
+}
+
 function friendly(e) {
   const m = String(e.message || e);
   if (S.engine === "lumionet" && /fetch|import|network|Failed|load/i.test(m)) return `LumioNet couldn't load (${m}). Check the model file and the ONNX Runtime address in js/config.js.`;

@@ -30,9 +30,9 @@ The page picks up whichever engines are available and hides the rest.
 
 | Engine | What it does | Needs |
 |---|---|---|
-| **Instant** *(default)* | Resizes with high-quality smoothing, then an unsharp mask on **luminance only** — no colour fringes, with a soft threshold that spares noise. | Nothing. Ships with the site. |
+| **Instant** *(default)* | **Lanczos-3 resampling** (edges stay hard instead of smearing) plus an adaptive unsharp mask on **luminance only** — no colour fringes, with a soft threshold that spares noise. Runs in bands in a Web Worker, so it goes up to **8K** without blowing up memory. | Nothing. Ships with the site. |
 | **LumioNet** | In-browser AI upscaling via ONNX Runtime Web, run in **tiles with context padding** so memory stays bounded on phones. | A trained `.onnx` model listed in `site/models/models.json`. |
-| **Server** | Uploads the photo to a backend that runs the heavy model. Strongest quality, enables 8K. | A backend serving `GET /api/health` and `POST /api/enhance`. |
+| **Server** | Uploads the photo to a backend that runs the heavy model. Strongest quality, and the way past 8K. | A backend serving `GET /api/health` and `POST /api/enhance`. |
 
 ### Learn another app's look
 
@@ -94,7 +94,7 @@ export default {
   tile: 128,                    // tile edge in input pixels
   pad: 24,                      // context pixels around each tile
   maxInputLongSide: 6000,       // larger photos are scaled down on load
-  maxBrowserLongSide: 3840,     // largest output the in-browser engines will make (4K)
+  maxBrowserLongSide: 7680,     // largest output the in-browser engines will make (8K)
 };
 ```
 
@@ -109,6 +109,8 @@ Put the `.onnx` file in `site/models/` and list it in `site/models/models.json`:
 ```
 
 Input must be float32 `[1,3,h,w]` RGB in `0..1`, output `[1,3,scale*h,scale*w]`. The first model in the list is the one that runs. See [`site/models/README.md`](site/models/README.md).
+
+To build one yourself — data prep, training and the ONNX export — see [`dev/training/README.md`](dev/training/README.md).
 
 ## Deployment
 
