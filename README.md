@@ -55,7 +55,9 @@ Use `localhost`, not `file://` — the app is built from ES modules and a module
 
 ```
 lumio-net/
-├── site/                  ← the published app (this is what GitHub Pages serves)
+├── index.html            ← Pages entry point: hands over to site/ (root source)
+├── .nojekyll             ← stops Jekyll from turning README.md into index.html
+├── site/                 ← the published app (the real frontend)
 │   ├── index.html
 │   ├── css/style.css
 │   ├── js/
@@ -114,21 +116,27 @@ The `site/` folder is the whole app. Publish it anywhere that serves static file
 
 ### GitHub Pages (this repo)
 
-The `gh-pages` branch holds the published site, so publishing is one command:
+The app lives in `site/`. The repo root carries a `.nojekyll` and a small `index.html` that hands over to it, so **any** of these Pages sources works:
+
+| Pages source | What the visitor gets | How it updates |
+|---|---|---|
+| `main` / `/ (root)` *(currently set)* | `/` → hands over to the app at `/site/` | automatically on every push to `main` |
+| `gh-pages` / `/ (root)` | the app straight at `/` | `./dev/deploy.sh` |
+| `main` / `/site` | the app straight at `/` | automatically on every push to `main` |
+
+*Settings → Pages → Build and deployment → Source: **Deploy from a branch** → Branch → Folder → Save.*
+
+Pick `gh-pages` (or `main` / `/site`) if you want the app served at the bare URL
+`https://rajesh-k01.github.io/lumio-net/` with no redirect in front of it. The
+`gh-pages` branch is published by one command:
 
 ```bash
 ./dev/deploy.sh     # copies site/ onto gh-pages and pushes it
 ```
 
-GitHub Pages serves that branch at **https://rajesh-k01.github.io/lumio-net/**.
-
-The first time, a repo admin has to switch Pages on (GitHub keeps this setting per repository):
-
-*Settings → Pages → Build and deployment → Source: **Deploy from a branch** → Branch: **gh-pages** → Folder: **/ (root)** → Save.*
-
-After that, every `./dev/deploy.sh` (or push to `gh-pages`) republishes the site automatically.
-
 **Prefer CI?** Copy `dev/ci/deploy-pages.yml` to `.github/workflows/deploy-pages.yml` and set the Pages source to **GitHub Actions**. Every push to `main` then deploys itself — no local command needed.
+
+> Why the root has a `.nojekyll`: without it GitHub runs Jekyll over the branch, and Jekyll turns `README.md` into `index.html` — so the published site shows the README text instead of the app. `.nojekyll` turns that off.
 
 ### Other hosts
 
