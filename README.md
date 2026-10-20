@@ -31,8 +31,34 @@ The page picks up whichever engines are available and hides the rest.
 | Engine | What it does | Needs |
 |---|---|---|
 | **Instant** *(default)* | **Lanczos-3 resampling** (edges stay hard instead of smearing) plus an adaptive unsharp mask on **luminance only** — no colour fringes, with a soft threshold that spares noise. Runs in bands in a Web Worker, so it goes up to **8K** without blowing up memory. | Nothing. Ships with the site. |
-| **LumioNet** | In-browser AI upscaling via ONNX Runtime Web, run in **tiles with context padding** so memory stays bounded on phones. | A trained `.onnx` model listed in `site/models/models.json`. |
+| **LumioNet** | **A trained neural network running in your browser** (ONNX Runtime Web, self-hosted). Run in **tiles with context padding** so memory stays bounded on phones. Ships with a trained ×2 model — see [The AI engine](#the-ai-engine). | Nothing. The model ships with the site. |
 | **Server** | Uploads the photo to a backend that runs the heavy model. Strongest quality, and the way past 8K. | A backend serving `GET /api/health` and `POST /api/enhance`. |
+
+### The AI engine
+
+`site/models/lumionet-x2.onnx` is a **real trained model**, not a placeholder: a compact
+EDSR-style residual network (140k parameters, 0.57 MB) trained here on 71 photos with a
+**pixel + gradient loss** — the gradient term is what stops a model going blurry.
+
+Measured on a degraded photo against its original, against a plain Lanczos upscale of the
+same input:
+
+| | sharpness | PSNR | SSIM |
+|---|---|---|---|
+| input | — | 28.43 dB | 0.7392 |
+| Lanczos (Instant engine) | 73.1 | 30.36 dB | 0.8416 |
+| **LumioNet (AI engine)** | **130.1** | **31.10 dB** | **0.8540** |
+| original | 585.6 | — | — |
+
+Sharper *and* closer to the original. The **AI strength** slider blends between the
+model and the plain Lanczos result, so you can dial the invented detail up or down.
+
+The model is small on purpose: it has to download and run on a phone. For better
+results, retrain it on your own photos (`dev/training/`) or drop in a pretrained
+Real-ESRGAN/SwinIR export — the app runs any ONNX model in this format.
+
+ONNX Runtime Web is **self-hosted in `site/vendor/`**, so the AI engine works without a
+third-party CDN and offline.
 
 ### Learn another app's look
 
@@ -166,7 +192,12 @@ The parity test runs the exported toy model through the JavaScript tiler and com
 
 ## Honest status
 
-- **No trained model is included.** LumioNet in `dev/` was only trained on toy shape images; it proves the pipeline runs in the browser, not that it beats other enhancers. Train it on real photos before relying on it.
+- **The shipped AI model is small and briefly trained.** It was trained on 71 photos for
+  2,500 steps on a CPU, which is enough to beat plain resampling by a clear margin and
+  not enough to match a state-of-the-art model. Retrain it on your own photos for
+  noticeably better results — see [`dev/training/README.md`](dev/training/README.md).
+- **The AI engine invents detail.** That is the point and also the risk: text, faces
+  and fine repeating patterns can come out wrong. The Instant engine never does that.
 - **Instant is classic upscaling and sharpening, not AI.** It is a solid, fast, private default — but it does not invent detail that isn't in the source.
 - **The Server engine was tested only against the backend's fallback resizer here**, not SeedVR2 on a GPU.
 

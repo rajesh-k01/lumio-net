@@ -13,7 +13,8 @@ the box, and it is a good one. This folder is how you build the AI one.
 ## What you need
 
 - A GPU. 8 GB of VRAM is enough for the small model below. On CPU it still runs,
-  but expect it to crawl.
+  but expect it to crawl (the model shipped in `site/models/` was trained on a
+  2-core CPU: 2,500 steps took ~13 minutes for ×2 and ~40 for ×4).
 - A folder of photos you have the right to train on. A few hundred good photos
   already teaches the model a lot. More and more diverse is better.
 - `pip install torch onnx pillow numpy`
@@ -32,12 +33,17 @@ sharpen nothing — the degradations are the whole point.
 ## 2. Train
 
 ```bash
-python3 dev/training/train.py --data data/train --out models/lumionet-x2.onnx --scale 2 --epochs 200
+python3 dev/training/train.py --photos ~/photos --out models/lumionet-x2.onnx --scale 2 --iters 2500
 ```
 
-The model is a small EDSR-style residual net with channel attention (~1.5M
-parameters). It predicts the *residual* over a bicubic upsample, which makes it
-learn much faster than predicting the whole image.
+`train.py` cuts the patches itself, so you can point it straight at a folder of
+photos. Use `prepare_dataset.py` first if you want the pairs on disk instead.
+
+The model is a small EDSR-style residual net (140k parameters at ×2). It
+predicts the *residual* over a bicubic upsample, which makes it learn much
+faster than predicting the whole image. The loss is **pixel + gradient**:
+a plain L1 loss is happy with a blurry average, and matching the gradients of
+the target is what forces hair, fabric weave and text to come back sharp.
 
 It exports ONNX with exactly the interface the app expects:
 
@@ -78,6 +84,19 @@ an afternoon. To use one:
 
 Keep the model small (a few MB to tens of MB). It is downloaded by every
 visitor, and ONNX Runtime Web runs it on the phone's CPU.
+
+## What the shipped model scored
+
+Trained on 71 photos for 2,500 steps on a CPU, then measured on a degraded
+photo against its original (same input for both methods):
+
+| | sharpness | PSNR | SSIM |
+|---|---|---|---|
+| Lanczos | 73.1 | 30.36 dB | 0.8416 |
+| **the model** | **130.1** | **31.10 dB** | **0.8540** |
+
+Sharper and closer to the original. Reproduce it with
+`python3 dev/quality/eval_model.py site/models/lumionet-x2.onnx photo.jpg`.
 
 ## Honest expectations
 

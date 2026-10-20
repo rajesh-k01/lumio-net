@@ -22,7 +22,8 @@ ARGS = ["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage", "--disable-s
 async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(args=ARGS, chromium_sandbox=False)
-        ctx = await b.new_context(viewport={"width": 1440, "height": 900}, accept_downloads=True)
+        ctx = await b.new_context(viewport={"width": 1440, "height": 900}, accept_downloads=True,
+                                  ignore_https_errors=os.environ.get("IGNORE_TLS") == "1")
         pg = await ctx.new_page()
         errs = []
         pg.on("pageerror", lambda e: errs.append(f"pageerror: {e}"))
