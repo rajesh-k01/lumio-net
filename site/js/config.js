@@ -8,8 +8,11 @@ export default {
   modelsIndex: "models/models.json",
 
   // ONNX Runtime Web, loaded only when the LumioNet engine is used.
+  // Self-hosted in site/vendor/ so the AI engine works without a third-party
+  // CDN (and offline). To use a CDN build instead, point this at
+  // https://cdn.jsdelivr.net/npm/onnxruntime-web@1.30.0/dist/ort.wasm.min.mjs
   // For GPU speed use ort.webgpu.min.mjs and providers: ["webgpu", "wasm"].
-  ortUrl: "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.30.0/dist/ort.wasm.min.mjs",
+  ortUrl: "vendor/ort.wasm.min.mjs",
   providers: ["wasm"],
 
   // Tiled inference: tile edge in input pixels, and context pixels added around each tile.

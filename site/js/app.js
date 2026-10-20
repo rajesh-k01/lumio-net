@@ -255,15 +255,14 @@ async function runLumioNet(id, [w, h]) {
   if (long > config.maxBrowserLongSide) { const k = config.maxBrowserLongSide / long; src = scaled(src, Math.round(src.width * k), Math.round(src.height * k)); }
   const sw = src.width, sh = src.height;
   const srcPx = src.getContext("2d").getImageData(0, 0, sw, sh).data;
-  const basePx = scaled(src, sw * s, sh * s).getContext("2d").getImageData(0, 0, sw * s, sh * s).data;
   const r = await callWorker({
     id, type: "lumionet", ortUrl: abs(config.ortUrl), modelUrl: abs(model.file), providers: config.providers,
     src: srcPx.buffer.slice(0), srcWidth: sw, srcHeight: sh, scale: s, tile: config.tile, pad: config.pad,
-    base: basePx.buffer, strength: $("detail").value / 100, ...toneArgs(),
+    outWidth: w, outHeight: h, strength: $("detail").value / 100, ...toneArgs(),
   }, [], (m) => setProgress(m.value * 0.97, eta(m.stage, m.value, m.elapsed)));
   const c = document.createElement("canvas"); c.width = r.width; c.height = r.height;
   c.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(r.pixels), r.width, r.height), 0, 0);
-  return scaled(c, w, h);
+  return c;
 }
 async function runServer() {
   S.cancel = new AbortController();

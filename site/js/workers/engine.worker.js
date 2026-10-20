@@ -55,9 +55,30 @@ self.onmessage = async ({ data: m }) => {
           return { data: res.output.data };
         },
       });
-      if (m.base && m.strength < 0.999) blendToward(out, new Uint8ClampedArray(m.base), m.strength);
+      if (m.strength < 0.999) {
+        // The honest fallback: a full Lanczos upscale of the same photo, in
+        // bands so 8K still fits in memory. Sliding between the two gives the
+        // user "AI strength" from plain resampling to full model output.
+        const ow = m.srcWidth * m.scale, oh = m.srcHeight * m.scale;
+        const base = enhanceLanczos(src, m.srcWidth, m.srcHeight, ow, oh, {
+          amount: 0, radius: 1, band: ow * oh > 20e6 ? 24 : 48,
+          isCancelled: () => cancelled.has(m.id),
+        });
+        blendToward(out, base, m.strength);
+      }
       if (m.lut && m.toneAmount > 0) applyLut(out, m.lut, m.toneAmount);
-      send({ id: m.id, type: "done", pixels: out.buffer, width: m.srcWidth * m.scale, height: m.srcHeight * m.scale }, [out.buffer]);
+      const ow = m.srcWidth * m.scale, oh = m.srcHeight * m.scale;
+      if (m.outWidth && (m.outWidth !== ow || m.outHeight !== oh)) {
+        // Land on the size the user asked for with the good kernel, not the
+        // canvas' bilinear one.
+        const final = enhanceLanczos(out, ow, oh, m.outWidth, m.outHeight, {
+          amount: 0, radius: 1, band: m.outWidth * m.outHeight > 20e6 ? 24 : 48,
+          isCancelled: () => cancelled.has(m.id),
+        });
+        send({ id: m.id, type: "done", pixels: final.buffer, width: m.outWidth, height: m.outHeight }, [final.buffer]);
+        return;
+      }
+      send({ id: m.id, type: "done", pixels: out.buffer, width: ow, height: oh }, [out.buffer]);
     }
   } catch (err) {
     send({ id: m.id, type: "error", cancelled: err instanceof Cancelled || err?.name === "Cancelled", message: String(err?.message || err) });

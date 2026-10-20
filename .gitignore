@@ -9,3 +9,7 @@ dev/e2e/shots/
 *.swp
 .idea/
 .vscode/
+
+# training checkpoints (the .onnx models themselves are committed)
+*.pt
+dev/quality/*.png

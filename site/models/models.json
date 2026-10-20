@@ -1,3 +1,5 @@
 {
-  "models": []
+  "models": [
+    { "id": "lumionet-x2", "name": "LumioNet", "file": "models/lumionet-x2.onnx", "scale": 2 }
+  ]
 }
